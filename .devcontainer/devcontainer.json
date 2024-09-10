@@ -1,0 +1,14 @@
+{
+	"name": "API Server Dev - Client",
+	"build": {
+        "dockerfile": "../Dockerfile.vsdev",
+        "context": ".."
+    },
+    "runArgs": [
+        "--init",
+        "--rm",
+        "-v",
+        "${localWorkspaceFolder}:/app"
+    ],
+    "workspaceFolder": "/app"
+}

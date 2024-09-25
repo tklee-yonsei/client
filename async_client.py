@@ -1,52 +1,81 @@
 import asyncio
+
 import aiohttp
 
-# 서버 URL 설정
-ENCODE_API_URL = "http://localhost:6002/encode/qpsk"  # QPSK 인코딩 API
-ADD_NOISE_API_URL = "http://localhost:6003/add_noise/gaussian"  # Gaussian 노이즈 추가 API
-DECODE_API_URL = "http://localhost:6002/decode/qpsk"  # QPSK 디코딩 API
+# 테스트할 방법 설정
+encoding_method = "hamming"  # 'pass', 'hamming', 'repetition'
+modulation_method = "qpsk"  # 'qpsk', 'bpsk'
+noise_method = "gaussian"  # 'gaussian', 'uniform'
 
-# 샘플 입력 신호
-signal = [1, 0, 1, 1]
-modulation_order = 4  # QPSK는 4차 변조 방식
+# 원본 데이터 비트
+original_bits = "11010011"
 
-async def qpsk_processing():
+
+async def main():
     async with aiohttp.ClientSession() as session:
-        # Step 1: QPSK 인코딩
-        print("Step 1: QPSK 인코딩")
-        encode_payload = {
-            "signal": signal,
-            "modulation_order": modulation_order
-        }
-        
-        async with session.post(ENCODE_API_URL, json=encode_payload) as response:
-            encoded_signal = await response.json()
-            encoded_signal = encoded_signal.get("encoded_signal")
-            print(f"Encoded Signal: {encoded_signal}")
+        # 1. 채널 코딩
+        async with session.post(
+            f"http://localhost:5001/encode/{encoding_method}",
+            json={"data_bits": original_bits},
+        ) as encode_resp:
+            if encode_resp.status != 200:
+                error = await encode_resp.json()
+                print(f"Error {error['error_code']}: {error['error']}")
+                return
+            coded_bits_list = (await encode_resp.json())["coded_bits"]
+            coded_bits = "".join(map(str, coded_bits_list))  # 리스트를 문자열로 변환
 
-        # Step 2: Gaussian 노이즈 추가
-        print("\nStep 2: Gaussian 노이즈 추가")
-        noise_payload = {
-            "encoded_signal": encoded_signal,
-            "noise_level": 0.1  # Gaussian 노이즈 레벨 설정
-        }
+        # 2. 변조
+        async with session.post(
+            f"http://localhost:5002/modulate/{modulation_method}",
+            json={"bits": coded_bits},
+        ) as modulate_resp:
+            if modulate_resp.status != 200:
+                error = await modulate_resp.json()
+                print(f"Error {error['error_code']}: {error['error']}")
+                return
+            symbols = (await modulate_resp.json())["symbols"]
 
-        async with session.post(ADD_NOISE_API_URL, json=noise_payload) as response:
-            noisy_signal = await response.json()
-            noisy_signal = noisy_signal.get("noisy_signal")
-            print(f"Noisy Signal: {noisy_signal}")
+        # 3. 노이즈 추가
+        async with session.post(
+            f"http://localhost:5003/add_noise/{noise_method}",
+            json={"symbols": symbols, "snr_db": 10},
+        ) as noise_resp:
+            if noise_resp.status != 200:
+                error = await noise_resp.json()
+                print(f"Error {error['error_code']}: {error['error']}")
+                return
+            noisy_symbols = (await noise_resp.json())["noisy_symbols"]
 
-        # Step 3: QPSK 디코딩
-        print("\nStep 3: QPSK 디코딩")
-        decode_payload = {
-            "encoded_signal": noisy_signal,
-            "modulation_order": modulation_order
-        }
+        # 4. 복조
+        async with session.post(
+            f"http://localhost:5002/demodulate/{modulation_method}",
+            json={"symbols": noisy_symbols},
+        ) as demodulate_resp:
+            if demodulate_resp.status != 200:
+                error = await demodulate_resp.json()
+                print(f"Error {error['error_code']}: {error['error']}")
+                return
+            demodulated_bits = (await demodulate_resp.json())["bits"]
 
-        async with session.post(DECODE_API_URL, json=decode_payload) as response:
-            decoded_signal = await response.json()
-            decoded_signal = decoded_signal.get("decoded_signal")
-            print(f"Decoded Signal: {decoded_signal}")
+        # 5. 채널 디코딩
+        demodulated_bits_list = list(
+            map(int, demodulated_bits)
+        )  # 문자열을 리스트로 변환
+        async with session.post(
+            f"http://localhost:5001/decode/{encoding_method}",
+            json={"coded_bits": demodulated_bits_list},
+        ) as decode_resp:
+            if decode_resp.status != 200:
+                error = await decode_resp.json()
+                print(f"Error {error['error_code']}: {error['error']}")
+                return
+            decoded_bits = (await decode_resp.json())["decoded_bits"]
+
+        # 결과 출력
+        print(f"Original Bits: {original_bits}")
+        print(f"Decoded Bits:  {decoded_bits}")
+
 
 # 비동기 함수 실행
-asyncio.run(qpsk_processing())
+asyncio.run(main())

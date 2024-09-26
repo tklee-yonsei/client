@@ -30,8 +30,25 @@ $ docker build -t async-client .
 
 Docker 컨테이너 실행
 ```console
-$ docker run --rm --network="host" -v $(pwd):/app async-client python async_client.py
+$ docker run --rm --network="host" -v $(pwd):/app async-client python async_client.py \
+  --es http://localhost:5001 \
+  --ms http://localhost:6002 \
+  --ns http://localhost:6003 \
+  --em xor \
+  --mm qpsk \
+  --nm gaussian \
+  --ob 11010011
 ```
+
+### 옵션 변수 설명
+
+- `--es`: 인코딩 서버 주소 (기본값: `http://localhost:5001`)
+- `--ms`: 변조 서버 주소 (기본값: `http://localhost:5002`)
+- `--ns`: 노이즈 서버 주소 (기본값: `http://localhost:5003`)
+- `--em`: 인코딩 방법 (기본값: `hamming`, 가능한 값: `pass`, `hamming`, `repetition`)
+- `--mm`: 변조 방법 (기본값: `qpsk`, 가능한 값: `qpsk`, `bpsk`)
+- `--nm`: 노이즈 방법 (기본값: `gaussian`, 가능한 값: `gaussian`, `uniform`)
+- `--ob`: 원본 비트 문자열 (기본값: `11010011`)
 
 ## License
 

@@ -16,7 +16,8 @@
     },
     "runArgs": [
         "--init",
-        "--rm",
+        // "--rm",
+        "--name", "api_server-client-dev_container",
         "-v",
         "${localWorkspaceFolder}:/app"
     ],
